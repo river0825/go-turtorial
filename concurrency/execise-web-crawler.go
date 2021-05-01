@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"sync"
 )
 
 type Fetcher interface {
@@ -13,30 +13,48 @@ type Fetcher interface {
 
 type fetchResult struct {
 	depth int
-	url string
-	body string
-	urls []string
-	err  error
+	url   string
+	body  string
+	urls  []string
+	err   error
+}
+
+type SafeCache struct {
+	m        sync.Mutex
+	urlCache map[string]fetchResult
+}
+
+func (sc *SafeCache) isCached(url string) bool {
+	_, ok := sc.urlCache[url]
+	return ok
+}
+func (sc *SafeCache) cache(result fetchResult) {
+	sc.m.Lock()
+	sc.urlCache[result.url] = result
+	sc.m.Unlock()
 }
 
 // Crawl uses fetcher to recursively crawl
 // pages starting with url, to a maximum of depth.
 
 func Crawl(url string, depth int, fetcher Fetcher) {
+	sc := SafeCache{urlCache: make(map[string]fetchResult)}
 	ch := make(chan fetchResult)
 	crawlRecursive(url, depth, fetcher, ch)
-	time.Sleep(time.Second)
 	for {
-		if result, ok := <- ch; ok {
-			if result.err != nil {
+		if result, ok := <-ch; ok {
+			if sc.isCached(result.url){
+				fmt.Printf("cached: %s %q\n", result.url, result.body)
+			} else if result.err != nil {
 				fmt.Println(result.err)
-			}else{
+			} else {
 				fmt.Printf("found: %s %q\n", result.url, result.body)
+				sc.cache(result)
 				for _, u := range result.urls {
 					crawlRecursive(u, result.depth-1, fetcher, ch)
 				}
 			}
-		}else{
+		} else {
 			close(ch)
 			return
 		}
@@ -63,20 +81,20 @@ type fakeResult struct {
 func (f fakeFetcher) Fetch(url string, depth int, ch chan fetchResult) {
 	if res, ok := f[url]; ok {
 		ch <- fetchResult{
-			url: url,
-			body: res.body,
-			urls: res.urls,
-			err:  nil,
+			url:   url,
+			body:  res.body,
+			urls:  res.urls,
+			err:   nil,
 			depth: depth,
 		}
 		return
 	}
 
 	ch <- fetchResult{
-		url: url,
-		body: "",
-		urls: nil,
-		err:  fmt.Errorf("not found: %s", url),
+		url:   url,
+		body:  "",
+		urls:  nil,
+		err:   fmt.Errorf("not found: %s", url),
 		depth: depth,
 	}
 }
