@@ -44,11 +44,12 @@ func Crawl(url string, depth int, fetcher Fetcher) {
 	for {
 		if result, ok := <-ch; ok {
 			if sc.isCached(result.url){
-				fmt.Printf("cached: %s %q\n", result.url, result.body)
+				fmt.Printf("cached[%d]: %s %q\n", result.depth, result.url, result.body)
 			} else if result.err != nil {
 				fmt.Println(result.err)
+				sc.cache(result)
 			} else {
-				fmt.Printf("found: %s %q\n", result.url, result.body)
+				fmt.Printf("found[%d]: %s %q\n", result.depth, result.url, result.body)
 				sc.cache(result)
 				for _, u := range result.urls {
 					crawlRecursive(u, result.depth-1, fetcher, ch)
