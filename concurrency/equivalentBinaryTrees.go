@@ -37,7 +37,7 @@ func Same(t1, t2 *tree.Tree) bool {
 	return true
 }
 
-func main() {
-	b := Same(tree.New(1), tree.New(1))
-	fmt.Println(b)
-}
+//func main() {
+//	b := Same(tree.New(1), tree.New(1))
+//	fmt.Println(b)
+//}
